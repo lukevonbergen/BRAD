@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>B.R.A.D - V3 - Fetch Limit Reached</title>
+    <title>B.R.A.D - V4 - UI</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -227,7 +227,24 @@
                 </div>
             `;
         }
-// Function to determine tube status color
+// Helper function to determine if a color is dark (for text contrast)
+        function isColorDark(hexColor) {
+            // Remove the hash if it exists
+            const hex = hexColor.replace('#', '');
+            
+            // Convert hex to RGB
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            
+            // Calculate luminance
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            
+            // Return true if the color is dark
+            return luminance < 0.5;
+        }
+
+        // Function to determine tube status color
         function getStatusColor(status) {
             const statusMap = {
                 'Good Service': 'bg-green-500',
@@ -250,7 +267,7 @@
             element.textContent = `Updated: ${moment().format('HH:mm:ss')}`;
         }
 
-// Fetch trains to London
+        // Fetch trains to London
         async function refreshToLondon() {
             const button = document.getElementById('refresh-to-london');
             const icon = button.querySelector('i');
@@ -369,18 +386,19 @@
                     const lineColor = lineColors[line.name] || '#666666';
                     const reason = line.lineStatuses[0].reason;
                     
+                    // Determine if we should use white or black text based on background color
+                    const isDarkColor = isColorDark(lineColor);
+                    const textColor = isDarkColor ? 'text-white' : 'text-black';
+                    
                     containerDiv.innerHTML += `
-                        <div class="p-3 bg-gray-50 rounded-lg">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-2 h-6" style="background-color: ${lineColor}"></div>
-                                <div class="flex-grow">
-                                    <div class="font-medium truncate">${line.name}</div>
-                                    <div class="flex items-center space-x-1">
-                                        <span class="inline-block w-2 h-2 rounded-full ${statusColor}"></span>
-                                        <span class="text-sm">${status}</span>
-                                    </div>
-                                    ${reason ? `<div class="text-xs text-gray-600 mt-1">${reason}</div>` : ''}
+                        <div class="p-3 rounded-lg" style="background-color: ${lineColor}">
+                            <div class="flex flex-col">
+                                <div class="font-medium ${textColor} truncate">${line.name}</div>
+                                <div class="flex items-center space-x-1">
+                                    <span class="inline-block w-2 h-2 rounded-full ${statusColor}"></span>
+                                    <span class="text-sm ${textColor} font-medium">${status}</span>
                                 </div>
+                                ${reason ? `<div class="text-xs ${textColor} mt-1 opacity-90">${reason}</div>` : ''}
                             </div>
                         </div>
                     `;
