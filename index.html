@@ -3,66 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>London Transport & Weather Dashboard</title>
+    <title>Complete Transport Dashboard</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100">
     <div class="container mx-auto px-4 py-8">
-        <h1 class="text-4xl font-bold text-gray-800 mb-8">Transport & Weather Dashboard</h1>
+        <h1 class="text-4xl font-bold text-gray-800 mb-8">Transport Dashboard</h1>
         
         <!-- Time and Date -->
         <div class="bg-white rounded-lg shadow-lg p-4 mb-8">
             <div id="datetime" class="text-2xl font-semibold text-gray-700"></div>
         </div>
 
-        <!-- Transport Section -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- TfL Status -->
+        <!-- Train Times Section -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- To London -->
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold">London Underground Status</h2>
-                    <div class="flex items-center space-x-4">
-                        <span id="last-updated" class="text-sm text-gray-500"></span>
+                    <h2 class="text-xl font-bold">Amersham → Marylebone</h2>
+                    <div class="flex items-center space-x-2">
+                        <span id="to-london-updated" class="text-sm text-gray-500"></span>
                         <button 
-                            onclick="refreshTubeStatus()"
-                            id="refresh-button"
+                            onclick="refreshToLondon()"
+                            id="refresh-to-london"
                             class="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                            title="Refresh tube status">
+                            title="Refresh London-bound trains">
                             <i class="fas fa-sync-alt text-gray-600 text-xl"></i>
                         </button>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="tube-status">
-                    <!-- TfL status will be dynamically inserted here -->
-                    <div class="text-gray-500">Click refresh to load tube status...</div>
+                <div id="to-london" class="space-y-4">
+                    <div class="animate-pulse">Loading...</div>
                 </div>
             </div>
 
-            <!-- Weather Section -->
+            <!-- From London -->
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-xl font-bold mb-4">Weather</h2>
-                <div class="space-y-4">
-                    <div id="london-weather" class="p-2 bg-gray-50 rounded">
-                        <div class="font-semibold">London</div>
-                        <div class="text-2xl font-bold">18°C</div>
-                        <div class="text-sm">Partly Cloudy</div>
-                    </div>
-                    <div id="wycombe-weather" class="p-2 bg-gray-50 rounded">
-                        <div class="font-semibold">High Wycombe</div>
-                        <div class="text-2xl font-bold">17°C</div>
-                        <div class="text-sm">Cloudy</div>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Marylebone → Amersham</h2>
+                    <div class="flex items-center space-x-2">
+                        <span id="from-london-updated" class="text-sm text-gray-500"></span>
+                        <button 
+                            onclick="refreshFromLondon()"
+                            id="refresh-from-london"
+                            class="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            title="Refresh Amersham-bound trains">
+                            <i class="fas fa-sync-alt text-gray-600 text-xl"></i>
+                        </button>
                     </div>
                 </div>
+                <div id="from-london" class="space-y-4">
+                    <div class="animate-pulse">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TfL Status Section -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">London Underground Status</h2>
+                <div class="flex items-center space-x-2">
+                    <span id="tube-updated" class="text-sm text-gray-500"></span>
+                    <button 
+                        onclick="refreshTubeStatus()"
+                        id="refresh-tube"
+                        class="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                        title="Refresh tube status">
+                        <i class="fas fa-sync-alt text-gray-600 text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="tube-status">
+                <div class="animate-pulse">Loading...</div>
             </div>
         </div>
     </div>
 
     <script>
-        // TfL API credentials
+        // API credentials
+        const TRANSPORT_APP_ID = '0b347585';
+        const TRANSPORT_APP_KEY = 'a29a814d83dddd6342ff3113a4bb339e';
         const TFL_APP_ID = '2967e378a8694d6cbd79a5f5d082d8c5';
         const TFL_APP_KEY = '58ab6a913c8c4fe8b0252fe67d90a860';
+
+        // Station codes
+        const AMERSHAM_CODE = 'AMR';
+        const MARYLEBONE_CODE = 'MYB';
 
         // Line colors matching TfL's official colors
         const lineColors = {
@@ -92,7 +120,61 @@
         setInterval(updateDateTime, 1000);
         updateDateTime();
 
-        // Function to determine status color
+        // Format train time display
+        function formatTrainTime(scheduledTime, estimatedTime, isArrival = false) {
+            const scheduled = moment(scheduledTime, 'HH:mm');
+            const estimated = estimatedTime ? moment(estimatedTime, 'HH:mm') : scheduled;
+            const diffMinutes = estimated.diff(scheduled, 'minutes');
+            
+            let statusClass = 'text-gray-700';
+            let statusText = '';
+            
+            if (diffMinutes > 0) {
+                statusClass = 'text-red-500';
+                statusText = ` (Delayed +${diffMinutes}m)`;
+            } else if (diffMinutes < 0) {
+                statusClass = 'text-green-500';
+                statusText = ` (Early ${diffMinutes}m)`;
+            }
+
+            return `
+                <div class="flex flex-col">
+                    <div class="text-sm text-gray-500">${isArrival ? 'Arrives' : 'Departs'}</div>
+                    <div class="${statusClass}">
+                        ${scheduled.format('HH:mm')}${statusText}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Update last refreshed time
+        function updateLastRefreshed(type) {
+            const element = document.getElementById(`${type}-updated`);
+            element.textContent = `Updated: ${moment().format('HH:mm:ss')}`;
+        }
+
+        // Create train card HTML
+        function createTrainCard(train) {
+            return `
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="font-medium">${train.operator_name}</div>
+                        <div class="text-sm px-2 py-1 bg-gray-200 rounded">
+                            Platform ${train.platform || 'TBA'}
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        ${formatTrainTime(train.aimed_departure_time, train.expected_departure_time)}
+                        ${formatTrainTime(train.aimed_arrival_time, train.expected_arrival_time, true)}
+                    </div>
+                    <div class="mt-2 text-sm ${train.status === 'ON TIME' ? 'text-green-600' : 'text-red-600'}">
+                        ${train.status}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Function to determine tube status color
         function getStatusColor(status) {
             const statusMap = {
                 'Good Service': 'bg-green-500',
@@ -109,26 +191,90 @@
             return statusMap[status] || 'bg-gray-500';
         }
 
-        // Update last refreshed time
-        function updateLastRefreshed() {
-            const lastUpdated = document.getElementById('last-updated');
-            lastUpdated.textContent = `Last updated: ${moment().format('HH:mm:ss')}`;
-        }
-
-        // Fetch TfL tube status with loading state
-        async function refreshTubeStatus() {
-            const button = document.getElementById('refresh-button');
+        // Fetch trains to London
+        async function refreshToLondon() {
+            const button = document.getElementById('refresh-to-london');
             const icon = button.querySelector('i');
-            const tubeStatusDiv = document.getElementById('tube-status');
+            const containerDiv = document.getElementById('to-london');
             
-            // Disable button and show loading state
             button.disabled = true;
-            button.classList.add('opacity-50', 'cursor-not-allowed');
             icon.classList.add('fa-spin');
             
             try {
                 const response = await fetch(
-                    `https://api.tfl.gov.uk/Line/Mode/tube,elizabeth-line,dlr,overground/Status?app_id=${TFL_APP_ID}&app_key=${TFL_APP_KEY}`
+                    `https://transportapi.com/v3/uk/train/station/${AMERSHAM_CODE}/live.json?` +
+                    `app_id=${TRANSPORT_APP_ID}&app_key=${TRANSPORT_APP_KEY}` +
+                    `&calling_at=${MARYLEBONE_CODE}&train_status=passenger`
+                );
+                
+                const data = await response.json();
+                
+                if (data.departures && data.departures.all.length > 0) {
+                    const nextTrains = data.departures.all.slice(0, 2);
+                    containerDiv.innerHTML = nextTrains.map(createTrainCard).join('');
+                } else {
+                    containerDiv.innerHTML = '<div class="text-gray-500">No direct trains found</div>';
+                }
+                
+                updateLastRefreshed('to-london');
+                
+            } catch (error) {
+                console.error('Error fetching to London trains:', error);
+                containerDiv.innerHTML = '<div class="text-red-500">Error loading train times. Please try again later.</div>';
+            } finally {
+                button.disabled = false;
+                icon.classList.remove('fa-spin');
+            }
+        }
+
+        // Fetch trains from London
+        async function refreshFromLondon() {
+            const button = document.getElementById('refresh-from-london');
+            const icon = button.querySelector('i');
+            const containerDiv = document.getElementById('from-london');
+            
+            button.disabled = true;
+            icon.classList.add('fa-spin');
+            
+            try {
+                const response = await fetch(
+                    `https://transportapi.com/v3/uk/train/station/${MARYLEBONE_CODE}/live.json?` +
+                    `app_id=${TRANSPORT_APP_ID}&app_key=${TRANSPORT_APP_KEY}` +
+                    `&calling_at=${AMERSHAM_CODE}&train_status=passenger`
+                );
+                
+                const data = await response.json();
+                
+                if (data.departures && data.departures.all.length > 0) {
+                    const nextTrains = data.departures.all.slice(0, 2);
+                    containerDiv.innerHTML = nextTrains.map(createTrainCard).join('');
+                } else {
+                    containerDiv.innerHTML = '<div class="text-gray-500">No direct trains found</div>';
+                }
+                
+                updateLastRefreshed('from-london');
+                
+            } catch (error) {
+                console.error('Error fetching from London trains:', error);
+                containerDiv.innerHTML = '<div class="text-red-500">Error loading train times. Please try again later.</div>';
+            } finally {
+                button.disabled = false;
+                icon.classList.remove('fa-spin');
+            }
+        }
+
+        // Fetch TfL tube status
+        async function refreshTubeStatus() {
+            const button = document.getElementById('refresh-tube');
+            const icon = button.querySelector('i');
+            const containerDiv = document.getElementById('tube-status');
+            
+            button.disabled = true;
+            icon.classList.add('fa-spin');
+            
+            try {
+                const response = await fetch(
+                    `https://api.tfl.gov.uk/Line/Mode/tube,elizabeth-line,dlr/Status?app_id=${TFL_APP_ID}&app_key=${TFL_APP_KEY}`
                 );
                 
                 if (!response.ok) {
@@ -136,45 +282,49 @@
                 }
                 
                 const data = await response.json();
-                tubeStatusDiv.innerHTML = ''; // Clear loading message
+                containerDiv.innerHTML = '';
 
                 data.sort((a, b) => a.name.localeCompare(b.name)).forEach(line => {
                     const status = line.lineStatuses[0].statusSeverityDescription;
                     const statusColor = getStatusColor(status);
                     const lineColor = lineColors[line.name] || '#666666';
+                    const reason = line.lineStatuses[0].reason;
                     
-                    tubeStatusDiv.innerHTML += `
-                        <div class="flex items-center space-x-2 p-1 text-sm">
-                            <div class="w-2 h-6" style="background-color: ${lineColor}"></div>
-                            <div class="flex-grow">
-                                <div class="font-medium truncate">${line.name}</div>
-                                <div class="flex items-center space-x-1">
-                                    <span class="inline-block w-2 h-2 rounded-full ${statusColor}"></span>
-                                    <span class="text-xs">${status}</span>
+                    containerDiv.innerHTML += `
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-2 h-6" style="background-color: ${lineColor}"></div>
+                                <div class="flex-grow">
+                                    <div class="font-medium truncate">${line.name}</div>
+                                    <div class="flex items-center space-x-1">
+                                        <span class="inline-block w-2 h-2 rounded-full ${statusColor}"></span>
+                                        <span class="text-sm">${status}</span>
+                                    </div>
+                                    ${reason ? `<div class="text-xs text-gray-600 mt-1">${reason}</div>` : ''}
                                 </div>
                             </div>
                         </div>
                     `;
                 });
                 
-                updateLastRefreshed();
+                updateLastRefreshed('tube');
                 
             } catch (error) {
                 console.error('Error fetching tube status:', error);
-                tubeStatusDiv.innerHTML = `
+                containerDiv.innerHTML = `
                     <div class="text-red-500">
                         Error loading tube status. Please try again later.
                     </div>
                 `;
             } finally {
-                // Re-enable button and restore original state
                 button.disabled = false;
-                button.classList.remove('opacity-50', 'cursor-not-allowed');
                 icon.classList.remove('fa-spin');
             }
         }
 
         // Initial load
+        refreshToLondon();
+        refreshFromLondon();
         refreshTubeStatus();
     </script>
 </body>
