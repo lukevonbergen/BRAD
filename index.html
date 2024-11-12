@@ -10,7 +10,7 @@
 </head>
 <body class="bg-gray-100">
     <div class="container mx-auto px-4 py-8">
-        <h1 class="text-4xl font-bold text-gray-800 mb-8">B.R.A.D (Best Resource for All Demand)</h1>
+        <h1 class="text-4xl font-bold text-gray-800 mb-8">BRAD / JARVIS</h1>
         
         <!-- Time and Date -->
         <div class="bg-white rounded-lg shadow-lg p-4 mb-8">
@@ -121,9 +121,40 @@
         updateDateTime();
 
         // Format train time display (Trainline style)
-        function formatTrainTime(scheduledTime, estimatedTime, isArrival = false) {
+        function formatTrainTime(scheduledTime, estimatedTime, isArrival = false, startsHere = false) {
+            if (startsHere && !isArrival) {
+                return `
+                    <div class="flex flex-col">
+                        <div class="text-sm text-gray-500">Departs</div>
+                        <div class="text-gray-700 font-medium">${scheduledTime}</div>
+                        <div class="text-xs text-gray-500">Origin station</div>
+                    </div>
+                `;
+            }
+
+            if (!scheduledTime && isArrival) {
+                return `
+                    <div class="flex flex-col">
+                        <div class="text-sm text-gray-500">Arrives</div>
+                        <div class="text-gray-700 font-medium">See status</div>
+                        <div class="text-xs text-gray-500">Check operator website</div>
+                    </div>
+                `;
+            }
+
             const scheduled = moment(scheduledTime, 'HH:mm');
+            if (!scheduled.isValid()) {
+                return `
+                    <div class="flex flex-col">
+                        <div class="text-sm text-gray-500">${isArrival ? 'Arrives' : 'Departs'}</div>
+                        <div class="text-gray-700">Time unavailable</div>
+                    </div>
+                `;
+            }
+
             const estimated = estimatedTime ? moment(estimatedTime, 'HH:mm') : scheduled;
+            if (!estimated.isValid()) return;
+
             const diffMinutes = estimated.diff(scheduled, 'minutes');
             
             if (diffMinutes > 0) {
@@ -150,14 +181,26 @@
 
         // Calculate journey duration
         function calculateDuration(departureTime, arrivalTime) {
+            if (!departureTime || !arrivalTime) return null;
+            
             const departure = moment(departureTime, 'HH:mm');
             const arrival = moment(arrivalTime, 'HH:mm');
-            return arrival.diff(departure, 'minutes');
+            
+            if (!departure.isValid() || !arrival.isValid()) return null;
+            
+            // Handle cases where arrival appears to be before departure (usually means arrival is next day)
+            let duration = arrival.diff(departure, 'minutes');
+            if (duration < 0) {
+                duration = arrival.add(1, 'day').diff(departure, 'minutes');
+            }
+            
+            return duration > 0 ? duration : null;
         }
 
         // Create train card HTML (Trainline style)
         function createTrainCard(train) {
             const duration = calculateDuration(train.aimed_departure_time, train.aimed_arrival_time);
+            const startsHere = !train.aimed_arrival_time;
             
             return `
                 <div class="bg-gray-50 p-4 rounded-lg">
@@ -168,12 +211,12 @@
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-4 mb-2">
-                        ${formatTrainTime(train.aimed_departure_time, train.expected_departure_time)}
+                        ${formatTrainTime(train.aimed_departure_time, train.expected_departure_time, false, startsHere)}
                         ${formatTrainTime(train.aimed_arrival_time, train.expected_arrival_time, true)}
                     </div>
                     <div class="flex items-center justify-between mt-3 pt-2 border-t border-gray-200">
                         <div class="text-sm text-gray-500">
-                            Journey time: ${duration} mins
+                            ${duration ? `Journey time: ${duration} mins` : ''}
                         </div>
                         <div class="text-sm ${train.status === 'ON TIME' ? 'text-green-600' : 'text-red-600'} font-medium">
                             ${train.status}
@@ -182,7 +225,6 @@
                 </div>
             `;
         }
-        
 // Function to determine tube status color
         function getStatusColor(status) {
             const statusMap = {
@@ -219,7 +261,7 @@
                 const response = await fetch(
                     `https://transportapi.com/v3/uk/train/station/${AMERSHAM_CODE}/live.json?` +
                     `app_id=${TRANSPORT_APP_ID}&app_key=${TRANSPORT_APP_KEY}` +
-                    `&calling_at=${MARYLEBONE_CODE}&train_status=passenger`
+                    `&calling_at=${MARYLEBONE_CODE}&train_status=passenger&darwin=true`
                 );
                 
                 const data = await response.json();
@@ -255,7 +297,7 @@
                 const response = await fetch(
                     `https://transportapi.com/v3/uk/train/station/${MARYLEBONE_CODE}/live.json?` +
                     `app_id=${TRANSPORT_APP_ID}&app_key=${TRANSPORT_APP_KEY}` +
-                    `&calling_at=${AMERSHAM_CODE}&train_status=passenger`
+                    `&calling_at=${AMERSHAM_CODE}&train_status=passenger&darwin=true`
                 );
                 
                 const data = await response.json();
