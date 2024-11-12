@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Complete Transport Dashboard</title>
+    <title>B.R.A.D</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100">
     <div class="container mx-auto px-4 py-8">
-        <h1 class="text-4xl font-bold text-gray-800 mb-8">Transport Dashboard</h1>
+        <h1 class="text-4xl font-bold text-gray-800 mb-8">B.R.A.D (Best Resource for All Demand)</h1>
         
         <!-- Time and Date -->
         <div class="bg-white rounded-lg shadow-lg p-4 mb-8">
@@ -120,41 +120,45 @@
         setInterval(updateDateTime, 1000);
         updateDateTime();
 
-        // Format train time display
+        // Format train time display (Trainline style)
         function formatTrainTime(scheduledTime, estimatedTime, isArrival = false) {
             const scheduled = moment(scheduledTime, 'HH:mm');
             const estimated = estimatedTime ? moment(estimatedTime, 'HH:mm') : scheduled;
             const diffMinutes = estimated.diff(scheduled, 'minutes');
             
-            let statusClass = 'text-gray-700';
-            let statusText = '';
-            
             if (diffMinutes > 0) {
-                statusClass = 'text-red-500';
-                statusText = ` (Delayed +${diffMinutes}m)`;
-            } else if (diffMinutes < 0) {
-                statusClass = 'text-green-500';
-                statusText = ` (Early ${diffMinutes}m)`;
-            }
-
-            return `
-                <div class="flex flex-col">
-                    <div class="text-sm text-gray-500">${isArrival ? 'Arrives' : 'Departs'}</div>
-                    <div class="${statusClass}">
-                        ${scheduled.format('HH:mm')}${statusText}
+                // Delayed
+                return `
+                    <div class="flex flex-col">
+                        <div class="text-sm text-gray-500">${isArrival ? 'Arrives' : 'Departs'}</div>
+                        <div class="text-gray-400 line-through">${scheduled.format('HH:mm')}</div>
+                        <div class="text-red-500">Expected ${estimated.format('HH:mm')}</div>
+                        ${isArrival ? '' : `<div class="text-xs text-red-500">+${diffMinutes}m late</div>`}
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // On time
+                return `
+                    <div class="flex flex-col">
+                        <div class="text-sm text-gray-500">${isArrival ? 'Arrives' : 'Departs'}</div>
+                        <div class="text-gray-700 font-medium">${scheduled.format('HH:mm')}</div>
+                        <div class="text-xs text-green-500">On time</div>
+                    </div>
+                `;
+            }
         }
 
-        // Update last refreshed time
-        function updateLastRefreshed(type) {
-            const element = document.getElementById(`${type}-updated`);
-            element.textContent = `Updated: ${moment().format('HH:mm:ss')}`;
+        // Calculate journey duration
+        function calculateDuration(departureTime, arrivalTime) {
+            const departure = moment(departureTime, 'HH:mm');
+            const arrival = moment(arrivalTime, 'HH:mm');
+            return arrival.diff(departure, 'minutes');
         }
 
-        // Create train card HTML
+        // Create train card HTML (Trainline style)
         function createTrainCard(train) {
+            const duration = calculateDuration(train.aimed_departure_time, train.aimed_arrival_time);
+            
             return `
                 <div class="bg-gray-50 p-4 rounded-lg">
                     <div class="flex justify-between items-center mb-3">
@@ -163,18 +167,23 @@
                             Platform ${train.platform || 'TBA'}
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-2 gap-4 mb-2">
                         ${formatTrainTime(train.aimed_departure_time, train.expected_departure_time)}
                         ${formatTrainTime(train.aimed_arrival_time, train.expected_arrival_time, true)}
                     </div>
-                    <div class="mt-2 text-sm ${train.status === 'ON TIME' ? 'text-green-600' : 'text-red-600'}">
-                        ${train.status}
+                    <div class="flex items-center justify-between mt-3 pt-2 border-t border-gray-200">
+                        <div class="text-sm text-gray-500">
+                            Journey time: ${duration} mins
+                        </div>
+                        <div class="text-sm ${train.status === 'ON TIME' ? 'text-green-600' : 'text-red-600'} font-medium">
+                            ${train.status}
+                        </div>
                     </div>
                 </div>
             `;
         }
-
-        // Function to determine tube status color
+        
+// Function to determine tube status color
         function getStatusColor(status) {
             const statusMap = {
                 'Good Service': 'bg-green-500',
@@ -189,6 +198,12 @@
                 'Reduced Service': 'bg-yellow-500'
             };
             return statusMap[status] || 'bg-gray-500';
+        }
+
+        // Update last refreshed time
+        function updateLastRefreshed(type) {
+            const element = document.getElementById(`${type}-updated`);
+            element.textContent = `Updated: ${moment().format('HH:mm:ss')}`;
         }
 
         // Fetch trains to London
