@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>B.R.A.D - V4 - UI</title>
+    <title>B.R.A.D - V5 - Accordian & Priority</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -244,6 +244,23 @@
             return luminance < 0.5;
         }
 
+        // Function to get status priority (higher number = higher priority to show)
+        function getStatusPriority(status) {
+            const priorityMap = {
+                'Suspended': 100,
+                'Part Suspended': 90,
+                'Severe Delays': 80,
+                'Part Closure': 70,
+                'Service Closed': 60,
+                'Planned Closure': 50,
+                'Minor Delays': 40,
+                'Reduced Service': 30,
+                'Special Service': 20,
+                'Good Service': 10
+            };
+            return priorityMap[status] || 0;
+        }
+
         // Function to determine tube status color
         function getStatusColor(status) {
             const statusMap = {
@@ -265,6 +282,14 @@
         function updateLastRefreshed(type) {
             const element = document.getElementById(`${type}-updated`);
             element.textContent = `Updated: ${moment().format('HH:mm:ss')}`;
+        }
+
+        // Toggle status details
+        function toggleStatusDetails(elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.classList.toggle('hidden');
+            }
         }
 
         // Fetch trains to London
@@ -380,25 +405,43 @@
                 const data = await response.json();
                 containerDiv.innerHTML = '';
 
-                data.sort((a, b) => a.name.localeCompare(b.name)).forEach(line => {
+                // Sort by status priority first, then alphabetically within same priority
+                const sortedData = data.sort((a, b) => {
+                    const priorityA = getStatusPriority(a.lineStatuses[0].statusSeverityDescription);
+                    const priorityB = getStatusPriority(b.lineStatuses[0].statusSeverityDescription);
+                    
+                    if (priorityB !== priorityA) {
+                        return priorityB - priorityA; // Higher priority first
+                    }
+                    
+                    // If same priority, sort alphabetically
+                    return a.name.localeCompare(b.name);
+                });
+
+                sortedData.forEach((line, index) => {
                     const status = line.lineStatuses[0].statusSeverityDescription;
                     const statusColor = getStatusColor(status);
                     const lineColor = lineColors[line.name] || '#666666';
                     const reason = line.lineStatuses[0].reason;
-                    
-                    // Determine if we should use white or black text based on background color
                     const isDarkColor = isColorDark(lineColor);
                     const textColor = isDarkColor ? 'text-white' : 'text-black';
                     
                     containerDiv.innerHTML += `
-                        <div class="p-3 rounded-lg" style="background-color: ${lineColor}">
+                        <div class="p-3 rounded-lg cursor-pointer transition-all duration-200 hover:opacity-90" 
+                             style="background-color: ${lineColor}"
+                             onclick="toggleStatusDetails('status-details-${index}')">
                             <div class="flex flex-col">
                                 <div class="font-medium ${textColor} truncate">${line.name}</div>
                                 <div class="flex items-center space-x-1">
                                     <span class="inline-block w-2 h-2 rounded-full ${statusColor}"></span>
                                     <span class="text-sm ${textColor} font-medium">${status}</span>
+                                    ${reason ? `<i class="fas fa-chevron-down ml-1 text-xs ${textColor} opacity-75"></i>` : ''}
                                 </div>
-                                ${reason ? `<div class="text-xs ${textColor} mt-1 opacity-90">${reason}</div>` : ''}
+                                ${reason ? `
+                                    <div id="status-details-${index}" class="text-xs ${textColor} mt-1 opacity-90 hidden">
+                                        ${reason}
+                                    </div>
+                                ` : ''}
                             </div>
                         </div>
                     `;
