@@ -250,7 +250,7 @@
             element.textContent = `Updated: ${moment().format('HH:mm:ss')}`;
         }
 
-        // Fetch trains to London
+// Fetch trains to London
         async function refreshToLondon() {
             const button = document.getElementById('refresh-to-london');
             const icon = button.querySelector('i');
@@ -263,16 +263,17 @@
                 const response = await fetch(
                     `https://transportapi.com/v3/uk/train/station/${AMERSHAM_CODE}/live.json?` +
                     `app_id=${TRANSPORT_APP_ID}&app_key=${TRANSPORT_APP_KEY}` +
-                    `&calling_at=${MARYLEBONE_CODE}&train_status=passenger&darwin=true`
+                    `&calling_at=${MARYLEBONE_CODE}&train_status=passenger`
                 );
                 
                 const data = await response.json();
+                console.log('To London data:', data); // For debugging
                 
-                if (data.departures && data.departures.all.length > 0) {
+                if (data.departures && data.departures.all && data.departures.all.length > 0) {
                     const nextTrains = data.departures.all.slice(0, 2);
                     containerDiv.innerHTML = nextTrains.map(createTrainCard).join('');
                 } else {
-                    containerDiv.innerHTML = '<div class="text-gray-500">No direct trains found</div>';
+                    containerDiv.innerHTML = '<div class="text-gray-500">No trains found - please try again</div>';
                 }
                 
                 updateLastRefreshed('to-london');
@@ -299,16 +300,17 @@
                 const response = await fetch(
                     `https://transportapi.com/v3/uk/train/station/${MARYLEBONE_CODE}/live.json?` +
                     `app_id=${TRANSPORT_APP_ID}&app_key=${TRANSPORT_APP_KEY}` +
-                    `&calling_at=${AMERSHAM_CODE}&train_status=passenger&darwin=true`
+                    `&calling_at=${AMERSHAM_CODE}&train_status=passenger`
                 );
                 
                 const data = await response.json();
+                console.log('From London data:', data); // For debugging
                 
-                if (data.departures && data.departures.all.length > 0) {
+                if (data.departures && data.departures.all && data.departures.all.length > 0) {
                     const nextTrains = data.departures.all.slice(0, 2);
                     containerDiv.innerHTML = nextTrains.map(createTrainCard).join('');
                 } else {
-                    containerDiv.innerHTML = '<div class="text-gray-500">No direct trains found</div>';
+                    containerDiv.innerHTML = '<div class="text-gray-500">No trains found - please try again</div>';
                 }
                 
                 updateLastRefreshed('from-london');
