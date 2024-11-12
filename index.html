@@ -266,8 +266,17 @@
                     `&calling_at=${MARYLEBONE_CODE}&train_status=passenger`
                 );
                 
+                if (response.status === 403) {
+                    containerDiv.innerHTML = `
+                        <div class="p-4 bg-yellow-50 text-yellow-800 rounded-lg">
+                            <p class="font-medium">Rate limit reached</p>
+                            <p class="text-sm mt-1">Please wait a few minutes before refreshing again.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
                 const data = await response.json();
-                console.log('To London data:', data); // For debugging
                 
                 if (data.departures && data.departures.all && data.departures.all.length > 0) {
                     const nextTrains = data.departures.all.slice(0, 2);
@@ -303,8 +312,17 @@
                     `&calling_at=${AMERSHAM_CODE}&train_status=passenger`
                 );
                 
+                if (response.status === 403) {
+                    containerDiv.innerHTML = `
+                        <div class="p-4 bg-yellow-50 text-yellow-800 rounded-lg">
+                            <p class="font-medium">Rate limit reached</p>
+                            <p class="text-sm mt-1">Please wait a few minutes before refreshing again.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
                 const data = await response.json();
-                console.log('From London data:', data); // For debugging
                 
                 if (data.departures && data.departures.all && data.departures.all.length > 0) {
                     const nextTrains = data.departures.all.slice(0, 2);
