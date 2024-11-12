@@ -1,11 +1,152 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Simple Page</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>London Transport & Weather Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
 </head>
-<body>
-    Hello
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold text-gray-800 mb-8">Transport & Weather Dashboard</h1>
+        
+        <!-- Time and Date -->
+        <div class="bg-white rounded-lg shadow-lg p-4 mb-8">
+            <div id="datetime" class="text-2xl font-semibold text-gray-700"></div>
+        </div>
+
+        <!-- Transport Section -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- TfL Status -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4">London Underground Status</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="tube-status">
+                    <!-- TfL status will be dynamically inserted here -->
+                    <div class="text-gray-500">Loading tube status...</div>
+                </div>
+            </div>
+
+            <!-- Weather Section -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4">Weather</h2>
+                <div class="space-y-4">
+                    <div id="london-weather" class="p-2 bg-gray-50 rounded">
+                        <div class="font-semibold">London</div>
+                        <div class="text-2xl font-bold">18°C</div>
+                        <div class="text-sm">Partly Cloudy</div>
+                    </div>
+                    <div id="wycombe-weather" class="p-2 bg-gray-50 rounded">
+                        <div class="font-semibold">High Wycombe</div>
+                        <div class="text-2xl font-bold">17°C</div>
+                        <div class="text-sm">Cloudy</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // TfL API credentials
+        const TFL_APP_ID = '2967e378a8694d6cbd79a5f5d082d8c5'; // Replace with your primary key
+        const TFL_APP_KEY = '58ab6a913c8c4fe8b0252fe67d90a860'; // Replace with your secondary key
+
+        // Line colors matching TfL's official colors
+        const lineColors = {
+            'Bakerloo': '#B36305',
+            'Central': '#E32017',
+            'Circle': '#FFD300',
+            'District': '#00782A',
+            'Hammersmith & City': '#F3A9BB',
+            'Jubilee': '#A0A5A9',
+            'Metropolitan': '#9B0056',
+            'Northern': '#000000',
+            'Piccadilly': '#003688',
+            'Victoria': '#0098D4',
+            'Waterloo & City': '#95CDBA',
+            'DLR': '#00A4A7',
+            'London Overground': '#EE7C0E',
+            'Elizabeth line': '#6950A1',
+            'Tram': '#84B817'
+        };
+
+        // Update date and time
+        function updateDateTime() {
+            const now = moment();
+            document.getElementById('datetime').textContent = now.format('dddd, MMMM Do YYYY, HH:mm:ss');
+        }
+        
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+
+        // Function to determine status color
+        function getStatusColor(status) {
+            const statusMap = {
+                'Good Service': 'bg-green-500',
+                'Minor Delays': 'bg-yellow-500',
+                'Severe Delays': 'bg-red-500',
+                'Part Suspended': 'bg-red-500',
+                'Suspended': 'bg-red-500',
+                'Part Closure': 'bg-red-500',
+                'Planned Closure': 'bg-gray-500',
+                'Service Closed': 'bg-gray-500',
+                'Special Service': 'bg-blue-500',
+                'Reduced Service': 'bg-yellow-500'
+            };
+            return statusMap[status] || 'bg-gray-500';
+        }
+
+        // Fetch TfL tube status
+        async function fetchTubeStatus() {
+            try {
+                const response = await fetch(
+                    `https://api.tfl.gov.uk/Line/Mode/tube,elizabeth-line,dlr,overground/Status?app_id=${TFL_APP_ID}&app_key=${TFL_APP_KEY}`
+                );
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const tubeStatusDiv = document.getElementById('tube-status');
+                tubeStatusDiv.innerHTML = ''; // Clear loading message
+
+                data.sort((a, b) => a.name.localeCompare(b.name)).forEach(line => {
+                    const status = line.lineStatuses[0].statusSeverityDescription;
+                    const statusColor = getStatusColor(status);
+                    const lineColor = lineColors[line.name] || '#666666';
+                    
+                    tubeStatusDiv.innerHTML += `
+                        <div class="flex items-center space-x-2 p-1 text-sm">
+                            <div class="w-2 h-6" style="background-color: ${lineColor}"></div>
+                            <div class="flex-grow">
+                                <div class="font-medium truncate">${line.name}</div>
+                                <div class="flex items-center space-x-1">
+                                    <span class="inline-block w-2 h-2 rounded-full ${statusColor}"></span>
+                                    <span class="text-xs">${status}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                console.error('Error fetching tube status:', error);
+                document.getElementById('tube-status').innerHTML = `
+                    <div class="text-red-500">
+                        Error loading tube status. Please try again later.
+                    </div>
+                `;
+            }
+        }
+
+        // Refresh tube status every 30 seconds
+        fetchTubeStatus();
+        setInterval(fetchTubeStatus, 30000);
+
+        // Weather placeholder remains the same
+        async function fetchWeatherData() {
+            // Weather API implementation will go here
+        }
+    </script>
 </body>
 </html>
