@@ -121,23 +121,13 @@
         updateDateTime();
 
 // Format train time display (Trainline style)
-        function formatTrainTime(scheduledTime, estimatedTime, isArrival = false, startsHere = false) {
-            if (startsHere && !isArrival) {
+        function formatTrainTime(scheduledTime, estimatedTime, isArrival = false) {
+            if (!scheduledTime) {
                 return `
                     <div class="flex flex-col">
-                        <div class="text-sm text-gray-500">Departs</div>
-                        <div class="text-gray-700 font-medium">${scheduledTime}</div>
-                        <div class="text-xs text-gray-500">Origin station</div>
-                    </div>
-                `;
-            }
-
-            if (!scheduledTime && isArrival) {
-                return `
-                    <div class="flex flex-col">
-                        <div class="text-sm text-gray-500">Arrives</div>
-                        <div class="text-gray-500">See status</div>
-                        <div class="text-xs text-gray-500">Check operator website</div>
+                        <div class="text-sm text-gray-500">${isArrival ? 'Arrives' : 'Departs'}</div>
+                        <div class="text-gray-700 font-medium">--:--</div>
+                        <div class="text-xs text-gray-500">Time unavailable</div>
                     </div>
                 `;
             }
@@ -189,21 +179,30 @@
             if (!departure.isValid() || !arrival.isValid()) return null;
             
             let duration = arrival.diff(departure, 'minutes');
-            // If duration is negative or unreasonably large, try adding 24 hours to arrival
-            if (duration < 0 || duration > 180) {
+            // If duration appears negative, assume arrival is next day
+            if (duration <= 0) {
                 arrival.add(24, 'hours');
                 duration = arrival.diff(departure, 'minutes');
             }
             
-            // Only return duration if it's reasonable for this route (typically 35-45 mins)
-            return (duration > 0 && duration < 180) ? duration : null;
+            // Only return duration if it's reasonable for this route (typically 35-60 mins)
+            return (duration > 0 && duration < 120) ? duration : null;
         }
 
         // Create train card HTML (Trainline style)
         function createTrainCard(train) {
-            const duration = calculateDuration(train.aimed_departure_time, train.aimed_arrival_time);
-            const startsHere = train.location_origin === train.station_name;
-            const isOrigin = train.location_origin && train.location_origin !== train.station_name;
+            // For arrival time, if it's less than departure time, add a day
+            let arrivalTime = train.aimed_arrival_time;
+            if (arrivalTime) {
+                const dep = moment(train.aimed_departure_time, 'HH:mm');
+                const arr = moment(arrivalTime, 'HH:mm');
+                if (arr.isBefore(dep)) {
+                    arr.add(1, 'day');
+                    arrivalTime = arr.format('HH:mm');
+                }
+            }
+
+            const duration = calculateDuration(train.aimed_departure_time, arrivalTime);
             
             return `
                 <div class="bg-gray-50 p-4 rounded-lg">
@@ -214,20 +213,15 @@
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-4 mb-2">
-                        ${formatTrainTime(train.aimed_departure_time, train.expected_departure_time, false, startsHere)}
-                        ${formatTrainTime(train.aimed_arrival_time, train.expected_arrival_time, true)}
+                        ${formatTrainTime(train.aimed_departure_time, train.expected_departure_time, false)}
+                        ${formatTrainTime(arrivalTime, train.expected_arrival_time, true)}
                     </div>
                     <div class="flex items-center justify-between mt-3 pt-2 border-t border-gray-200">
                         <div class="text-sm text-gray-500">
                             ${duration ? `Journey time: ${duration} mins` : ''}
                         </div>
-                        <div class="flex items-center justify-end">
-                            ${isOrigin ? 
-                                '<span class="text-sm text-red-600 font-medium">CHANGE OF ORIGIN</span>' : 
-                                startsHere ? 
-                                    '<span class="text-sm text-red-600 font-medium">STARTS HERE</span>' : 
-                                    `<span class="text-sm ${train.status === 'ON TIME' ? 'text-green-600' : 'text-red-600'} font-medium">${train.status}</span>`
-                            }
+                        <div class="text-sm ${train.status === 'ON TIME' ? 'text-green-600' : 'text-red-600'} font-medium">
+                            ${train.status}
                         </div>
                     </div>
                 </div>
