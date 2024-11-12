@@ -120,7 +120,7 @@
         setInterval(updateDateTime, 1000);
         updateDateTime();
 
-        // Format train time display (Trainline style)
+// Format train time display (Trainline style)
         function formatTrainTime(scheduledTime, estimatedTime, isArrival = false, startsHere = false) {
             if (startsHere && !isArrival) {
                 return `
@@ -136,7 +136,7 @@
                 return `
                     <div class="flex flex-col">
                         <div class="text-sm text-gray-500">Arrives</div>
-                        <div class="text-gray-700 font-medium">See status</div>
+                        <div class="text-gray-500">See status</div>
                         <div class="text-xs text-gray-500">Check operator website</div>
                     </div>
                 `;
@@ -188,19 +188,22 @@
             
             if (!departure.isValid() || !arrival.isValid()) return null;
             
-            // Handle cases where arrival appears to be before departure (usually means arrival is next day)
             let duration = arrival.diff(departure, 'minutes');
-            if (duration < 0) {
-                duration = arrival.add(1, 'day').diff(departure, 'minutes');
+            // If duration is negative or unreasonably large, try adding 24 hours to arrival
+            if (duration < 0 || duration > 180) {
+                arrival.add(24, 'hours');
+                duration = arrival.diff(departure, 'minutes');
             }
             
-            return duration > 0 ? duration : null;
+            // Only return duration if it's reasonable for this route (typically 35-45 mins)
+            return (duration > 0 && duration < 180) ? duration : null;
         }
 
         // Create train card HTML (Trainline style)
         function createTrainCard(train) {
             const duration = calculateDuration(train.aimed_departure_time, train.aimed_arrival_time);
-            const startsHere = !train.aimed_arrival_time;
+            const startsHere = train.location_origin === train.station_name;
+            const isOrigin = train.location_origin && train.location_origin !== train.station_name;
             
             return `
                 <div class="bg-gray-50 p-4 rounded-lg">
@@ -218,8 +221,13 @@
                         <div class="text-sm text-gray-500">
                             ${duration ? `Journey time: ${duration} mins` : ''}
                         </div>
-                        <div class="text-sm ${train.status === 'ON TIME' ? 'text-green-600' : 'text-red-600'} font-medium">
-                            ${train.status}
+                        <div class="flex items-center justify-end">
+                            ${isOrigin ? 
+                                '<span class="text-sm text-red-600 font-medium">CHANGE OF ORIGIN</span>' : 
+                                startsHere ? 
+                                    '<span class="text-sm text-red-600 font-medium">STARTS HERE</span>' : 
+                                    `<span class="text-sm ${train.status === 'ON TIME' ? 'text-green-600' : 'text-red-600'} font-medium">${train.status}</span>`
+                            }
                         </div>
                     </div>
                 </div>
