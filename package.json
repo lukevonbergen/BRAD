@@ -1,0 +1,19 @@
+{
+  "name": "dash-assistant",
+  "version": "1.0.0",
+  "description": "DASH - Digital Assistant for Scheduling and Home",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "assistant",
+    "voice",
+    "calendar",
+    "tfl",
+    "jarvis"
+  ],
+  "author": "Luke von Bergen",
+  "license": "MIT"
+}
