@@ -317,19 +317,41 @@
 
             const utterance = new SpeechSynthesisUtterance(text);
 
-            // Try to find a British English voice
+            // Try to find a high-quality British English voice
             const voices = window.speechSynthesis.getVoices();
-            const britishVoice = voices.find(voice =>
-                voice.lang === 'en-GB' || voice.lang.startsWith('en-GB')
-            );
 
-            if (britishVoice) {
-                utterance.voice = britishVoice;
+            // Preferred voices in order (more natural sounding)
+            const preferredVoices = [
+                'Daniel', // British male (iOS/macOS)
+                'Google UK English Male',
+                'Google UK English Female',
+                'Microsoft George - English (United Kingdom)',
+                'Microsoft Hazel - English (United Kingdom)',
+            ];
+
+            let selectedVoice = null;
+
+            // First, try to find preferred voices
+            for (const voiceName of preferredVoices) {
+                selectedVoice = voices.find(v => v.name.includes(voiceName));
+                if (selectedVoice) break;
+            }
+
+            // Fallback to any British English voice
+            if (!selectedVoice) {
+                selectedVoice = voices.find(voice =>
+                    voice.lang === 'en-GB' || voice.lang.startsWith('en-GB')
+                );
+            }
+
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
             }
 
             utterance.lang = 'en-GB';
-            utterance.rate = 0.95;
-            utterance.pitch = 1.0;
+            utterance.rate = 1.0; // Natural speed
+            utterance.pitch = 1.0; // Natural pitch
+            utterance.volume = 1.0;
 
             window.speechSynthesis.speak(utterance);
         }
@@ -354,8 +376,8 @@
 
         // Send suggested prompt
         function sendSuggestedPrompt(message) {
-            document.getElementById('text-input').value = message;
             sendMessage(message);
+            document.getElementById('text-input').value = '';
         }
 
         // Clear chat
@@ -393,6 +415,46 @@
 
             messagesDiv.appendChild(messageDiv);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Add message with typing animation
+        function addTypingMessage(text) {
+            const messagesDiv = document.getElementById('chat-messages');
+
+            // Remove welcome message if it exists
+            const welcomeMsg = messagesDiv.querySelector('.text-center');
+            if (welcomeMsg) {
+                welcomeMsg.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'flex justify-start';
+            messageDiv.id = 'typing-message';
+
+            messageDiv.innerHTML = `
+                <div class="message-bubble bg-gray-200 text-gray-800 px-4 py-3 rounded-lg">
+                    <i class="fas fa-robot mr-2"></i>
+                    <span id="typing-text"></span>
+                </div>
+            `;
+
+            messagesDiv.appendChild(messageDiv);
+
+            // Typing animation
+            const textSpan = document.getElementById('typing-text');
+            let index = 0;
+            const speed = 15; // milliseconds per character
+
+            function typeCharacter() {
+                if (index < text.length) {
+                    textSpan.textContent += text.charAt(index);
+                    index++;
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                    setTimeout(typeCharacter, speed);
+                }
+            }
+
+            typeCharacter();
         }
 
         // Add typing indicator
@@ -491,12 +553,44 @@
                     calendarId: 'primary',
                     timeMin: timeMin || new Date().toISOString(),
                     timeMax: timeMax,
-                    maxResults: 20,
+                    maxResults: 50, // Fetch more to account for filtering
                     singleEvents: true,
                     orderBy: 'startTime'
                 });
 
-                return response.result.items;
+                // Filter out unwanted events
+                const filteredEvents = response.result.items.filter(event => {
+                    // Skip if no summary
+                    if (!event.summary) return false;
+
+                    const summary = event.summary.toLowerCase();
+
+                    // Filter out working location/focus time events
+                    const excludeKeywords = [
+                        'working location',
+                        'focus time',
+                        'lunch',
+                        'out of office',
+                        'ooo',
+                        'wfh',
+                        'working from home'
+                    ];
+
+                    // Check if event summary contains any excluded keywords
+                    const shouldExclude = excludeKeywords.some(keyword =>
+                        summary.includes(keyword)
+                    );
+
+                    if (shouldExclude) return false;
+
+                    // Also filter out events with transparency = 'transparent' (free events)
+                    if (event.transparency === 'transparent') return false;
+
+                    return true;
+                });
+
+                // Return only the first 20 after filtering
+                return filteredEvents.slice(0, 20);
             } catch (error) {
                 console.error('Error fetching calendar events:', error);
                 return null;
@@ -541,8 +635,13 @@
                 const assistantResponse = data.response;
 
                 hideTypingIndicator();
-                addMessageToChat(assistantResponse, false);
-                speak(assistantResponse);
+                addTypingMessage(assistantResponse); // Use typing animation
+
+                // Wait for typing animation to complete before speaking
+                const typingDuration = assistantResponse.length * 15;
+                setTimeout(() => {
+                    speak(assistantResponse);
+                }, typingDuration);
 
                 // Update chat history
                 chatHistory.push({ role: 'user', content: message });
