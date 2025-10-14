@@ -184,9 +184,9 @@
         </div>
     </div>
 
-    <!-- Google API -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js"></script>
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
+    <script src="https://apis.google.com/js/api.js" async defer onload="gapiLoaded()"></script>
 
     <script>
         // Configuration - UPDATE THESE VALUES
@@ -418,43 +418,66 @@
             }
         }
 
+        // Initialize Google Identity Services
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
+
+        function gapiLoaded() {
+            gapi.load('client', async () => {
+                await gapi.client.init({
+                    apiKey: '', // Not needed for OAuth
+                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
+                });
+                gapiInited = true;
+            });
+        }
+
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CONFIG.googleClientId,
+                scope: 'https://www.googleapis.com/auth/calendar.readonly',
+                callback: (response) => {
+                    if (response.error !== undefined) {
+                        console.error('Auth error:', response);
+                        addMessageToChat('Failed to connect to Google Calendar. Please try again.', false);
+                        return;
+                    }
+
+                    googleAccessToken = response.access_token;
+                    gapi.client.setToken({access_token: googleAccessToken});
+
+                    document.getElementById('auth-status').textContent = 'Connected';
+                    document.getElementById('google-auth-btn').classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                    document.getElementById('google-auth-btn').classList.add('bg-green-500', 'hover:bg-green-600');
+
+                    addMessageToChat('Calendar connected successfully! You can now ask me about your schedule.', false);
+                    speak('Calendar connected successfully!');
+                },
+            });
+            gisInited = true;
+        }
+
         // Google Calendar Authentication
-        async function handleGoogleAuth() {
+        function handleGoogleAuth() {
             if (googleAccessToken) {
                 // Sign out
                 googleAccessToken = null;
+                gapi.client.setToken(null);
                 document.getElementById('auth-status').textContent = 'Connect Calendar';
+                document.getElementById('google-auth-btn').classList.remove('bg-green-500', 'hover:bg-green-600');
+                document.getElementById('google-auth-btn').classList.add('bg-blue-500', 'hover:bg-blue-600');
                 addMessageToChat('Calendar disconnected.', false);
                 return;
             }
 
-            try {
-                // Initialize Google API client
-                await new Promise((resolve) => {
-                    gapi.load('client:auth2', resolve);
-                });
-
-                await gapi.client.init({
-                    clientId: CONFIG.googleClientId,
-                    scope: 'https://www.googleapis.com/auth/calendar.readonly',
-                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
-                });
-
-                const authInstance = gapi.auth2.getAuthInstance();
-                const user = await authInstance.signIn();
-                googleAccessToken = user.getAuthResponse().access_token;
-
-                document.getElementById('auth-status').textContent = 'Connected';
-                document.getElementById('google-auth-btn').classList.remove('bg-blue-500', 'hover:bg-blue-600');
-                document.getElementById('google-auth-btn').classList.add('bg-green-500', 'hover:bg-green-600');
-
-                addMessageToChat('Calendar connected successfully! You can now ask me about your schedule.', false);
-                speak('Calendar connected successfully!');
-
-            } catch (error) {
-                console.error('Google auth error:', error);
-                addMessageToChat('Failed to connect to Google Calendar. Please try again.', false);
+            if (!gapiInited || !gisInited) {
+                addMessageToChat('Google services are still loading. Please try again in a moment.', false);
+                return;
             }
+
+            // Request access token
+            tokenClient.requestAccessToken({prompt: ''});
         }
 
         // Fetch calendar events
