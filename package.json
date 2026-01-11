@@ -1,18 +1,17 @@
 {
-  "name": "dash-assistant",
+  "name": "daily-tracker",
   "version": "1.0.0",
-  "description": "DASH - Digital Assistant for Scheduling and Home",
+  "description": "Personal daily tracker for meals and running",
   "main": "index.html",
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod"
   },
   "keywords": [
-    "assistant",
-    "voice",
-    "calendar",
-    "tfl",
-    "jarvis"
+    "tracker",
+    "health",
+    "running",
+    "supabase"
   ],
   "author": "Luke von Bergen",
   "license": "MIT"
